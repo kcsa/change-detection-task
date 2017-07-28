@@ -33,6 +33,7 @@ p.rndSeed = rng;
 % Important options
 %-------------------------------------------------------------------------
 p.windowed = 0; % 1 = smaller window for easy debugging!
+p.manually_initiate = 0; 
 p.manually_hide_taskbar = 0; % If this is a PC and you want to use the Mex file to hide the taskbar manually
 
 % Throw an error if you try to manually hide the taskbar on a Mac
@@ -112,7 +113,10 @@ stim.rt = NaN(prefs.numTrials,prefs.numBlocks);
 stim.probeLoc = NaN(prefs.numTrials,prefs.numBlocks,2); % 3rd dimension = (x,y) coordinates
 stim.presentedColor = NaN(prefs.numTrials,prefs.numBlocks); % color originally presented at the probed location
 stim.probeColor = NaN(prefs.numTrials,prefs.numBlocks); % color presented during the actual probe test
-
+% If manually starting each trial, time how long it takes them. 
+if p.manually_initiate 
+    stim.time_to_initiate = NaN(prefs.numTrials,prefs.numBlocks);
+end
 % stim.itemLocs is a cell structure that will save the locations (centroids
 % of all items. stim.itemLocs{trialNumber,blockNumber} = [xloc1 xloc2 ....; yloc1, yloc2 ...];
 % stim.itemColors is a cell structure taht identifies the color of each
@@ -173,6 +177,24 @@ for b = 1:prefs.numBlocks
         %--------------------------------------------------------
         % Now that we're done, actually run all the trial events! 
         %--------------------------------------------------------
+       
+        % manually initiate each trial if p.manual_initiate is set to 1 
+        if p.manually_initiate 
+            % Wait for a spacebar press to continue with next block
+            start_initiate = GetSecs; 
+            while 1
+                [keyIsDown,secs,keyCode]=KbCheck;
+                if keyIsDown
+                    kp = find(keyCode);
+                    if kp == space
+                        end_initiate = GetSecs;
+                        break;
+                    end
+                end
+            end
+            stim.time_to_initiate(t,b) = end_initiate-start_initiate; 
+        end
+        
         Screen('FillRect',win.onScreen,win.foreColor);      % Draw the foreground win
         Screen('FillOval',win.onScreen,win.black,win.fixRect);           % Draw the fixation point
         Screen('DrawingFinished',win.onScreen);                          % Tell ptb we're done drawing for the moment (makes subsequent flip command execute faster)
@@ -218,13 +240,14 @@ for b = 1:prefs.numBlocks
             if keyIsDown
                 if keyCode(escape)                              % if escape is pressed, bail out
                     ListenChar(0);
-                    % save data file at the end of each block
+                    % save data file if we abort the session
+                    p.date_time_end = clock; % record time and date of the end of the sesssion
                     save(fileName,'p','stim','prefs','win');
                     Screen('CloseAll');
                     return;
                 end
                 kp = find(keyCode);
-                kp = kp(1); % in case they press 2 buttons at the EXACT same time!!! Not that this some previous experiment sessions, but yep. it did.
+                kp = kp(1); % in case they press 2 buttons at the EXACT same time!!! Not that this happened at the most aggravating possible point in some previous experiment sessions, but yep. it did.
                 if kp== prefs.changeKey || kp== prefs.nochangeKey
                     stim.response(t,b)=kp;
                     rtEnd = GetSecs;
@@ -255,7 +278,7 @@ for b = 1:prefs.numBlocks
                 stim.accuracy(t,b)=0;
             end
         end
-        
+
     end    % end of trial loop
     
     % save data file at the end of each block
@@ -264,7 +287,7 @@ for b = 1:prefs.numBlocks
     % tell subjects that they've finished the current block / the experiment
     if b<prefs.numBlocks
         tic
-        while toc < prefs.breakLength*60;
+        while toc < prefs.breakLength*60
             tocInd = round(toc);
             Screen('FillRect',win.onScreen,win.foreColor);            % Draw the foreground win
             Screen('FillOval',win.onScreen,win.black,win.fixRect);           % Draw the fixation point
@@ -465,7 +488,12 @@ end
 %-------------------------------------------------------------------------
 function win = openWindow(p) % open up the window!
 
-win.screenNumber = min(Screen('Screens')); % may need to change for multiscreen displays
+win.screenNumber = max(Screen('Screens')); % may need to change for multiscreen displays!! 
+
+if ~ispc % On mac's, it won't open a psychtoolbox window if it can't detect the refresh rate!!! Skip sync tests to avoid this.
+    Screen('Preference','SkipSyncTests',1);
+end
+
 %-------------------------------------------------------------------------
 %  SMALLER DEBUGGING WINDOW: p.windowed = 0; FULL SCREEN: p.windowed == 1
 %-------------------------------------------------------------------------
@@ -491,7 +519,7 @@ else
     win.centerXL = floor(mean([0 win.centerX])); % center of left half of screen in X direction
     win.centerXR = floor(mean([win.centerX win.screenX])); % center of right half of screen in X direction
     % size of bounding box for squares to appear in
-    win.foreRect = round(win.screenRect./1.5);
+    win.foreRect = [0 0 700 700];
     win.foreRect = CenterRect(win.foreRect,win.screenRect);
     
     HideCursor; % hide the cursor since we're not debugging
@@ -528,9 +556,9 @@ end
 %-------------------------------------------------------------------------
 function prefs = getPreferences
 %%%% Design conditions
-prefs.numBlocks = 9;
-prefs.nTrialsPerCondition = 10;
-prefs.setSizes = [4,6,8]; % only set size 2 for this experiment right now.
+prefs.numBlocks = 4;
+prefs.nTrialsPerCondition = 8;
+prefs.setSizes = [4,6,8]; 
 prefs.change = [0,1]; % 0 = no change, 1 = change!
 
 %%%%% timing
@@ -544,12 +572,12 @@ prefs.stimSize = 60;
 prefs.minDist = prefs.stimSize*1.5;
 prefs.fixationSize = 6;
 
-%%%%% randomize trial order of full factorial design order
+%%%%% full factorial design matrix (randomize later)
 prefs.fullFactorialDesign = fullfact([length(prefs.setSizes), ...
     length(prefs.change), ...
     prefs.nTrialsPerCondition]);
 
-%%%%% total number of trials in each fully-crossed block.
+%%%%% total number of trials within each fully-balanced block.
 prefs.numTrials = size(prefs.fullFactorialDesign,1);
 end
 
