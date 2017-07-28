@@ -1,10 +1,15 @@
 # Read me for Color Change Detection Task
 written by Kirsten Adam, last updated 27 July 2017
+
 ## Required software
 This code runs in MATLAB using Psychtoolbox (<http://psychtoolbox.org>). The task should be compatible with both Mac and PC - it was tested on an iMac running OS X El Capitan (10.11.6) and on a PC running Windows 7. 
 
 ## Setting up the code
 Place the experiment script and the instructions file in a folder, and make sure this folder is on Matlab's path. Right now, the script is set up to create a folder called `Subject Data` within the current directory and save the data there. If you want the data to be saved elsewhere, you will need to update the experiment's main directory, `p.root`. 
+
+## General notes
+* This code will not let you over-write existing data-files with the same subject number. For practice that will not be saved, use the subject number "0". Only this subject number can be over-written. If you want to save multiple files for the same subject (e.g. multiple sessions) you will need to change how the files are named / saved. d
+* To escape in the middle of a session, hit the "ESCAPE" button during the response screen. This will save all data up to the current trial. Otherwise, the data is only saved to the file at the end of each block of trials. 
  
 ## Common changes that need to be made 
 * Many of the key settings are in the sub-function `getPreferences()`. For example, you might change the number of blocks, set sizes, or number of trials per block. Set Size and Change (0 or 1) are fully counterbalanced within each block using the matlab function `fullfact`. To calculate the number of trials per block, multiple the length of `prefs.setSizes`, `prefs.change`, and the desired number of repetitions, `prefs.nTrialsPerCondition`. To add a new condition to be counterbalanced within block, you can easily do so by adding it to `prefs.fullFactorialDesign`. 
