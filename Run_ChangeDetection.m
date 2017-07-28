@@ -52,10 +52,10 @@ end
 %-------------------------------------------------------------------------
 win = openWindow(p);
 %Manually hide the task bar so it doesn't pop up because of flipping
-%the PTB screen during GetMouse: (Note, this is only needed because of an annoying
-% glitch with newer windows machines specifically when calling functions within functions.
+%the PTB screen (Note, this is only needed because of an annoying
+% glitch that I can't figure out wiht newer windows machines... 
 % Setting the windows settings to "auto-hide the taskbar" can also work,
-% try that first.
+% try that first! if that doesn't work, use this Mex file .
 if p.manually_hide_taskbar
     ShowHideWinTaskbarMex(0);
 end
@@ -84,6 +84,20 @@ prefs = getPreferences();  % function that grabs all of our preferences (at the 
 % set up fixation point rect (b/c uses both prefs and win)
 win.fixRect = [(win.centerX - prefs.fixationSize),(win.centerY - prefs.fixationSize), ...
     (win.centerX  + prefs.fixationSize), (win.centerY + prefs.fixationSize)];
+
+win.colors = win.colors_9;
+%--------------------------------------------------------
+% Set up the keys on the keyboard we'll be using (unify so works on mac
+% & PC)
+%--------------------------------------------------------
+while KbCheck; end;
+KbName('UnifyKeyNames');   % This command switches keyboard mappings to the OSX naming scheme, regardless of computer.
+% unify key names so we don't need to mess when switching from mac
+% to pc ...
+escape = KbName('ESCAPE');  % Mac == 'ESCAPE' % PC == 'esc'
+prefs.changeKey = KbName('/?'); % on mac, 56 % 191 == / pc
+prefs.nochangeKey = KbName('z'); % on mac, 29  % 90 == z
+space = KbName('space');
 %--------------------------------------------------------
 % Preallocate some variable structures! :)
 %--------------------------------------------------------
@@ -118,8 +132,6 @@ for b = 1:prefs.numBlocks
     stim.setSize(:,b) = prefs.setSizes(prefs.fullFactorialDesign(prefs.order(:,b), 1));
     stim.change(:,b) = prefs.change(prefs.fullFactorialDesign(prefs.order(:,b),2));
     
-    win.colors = win.colors_9;
-    
     %-------------------------------------------------------
     % Begin Trial Loop
     %-------------------------------------------------------
@@ -130,7 +142,7 @@ for b = 1:prefs.numBlocks
         nItems = stim.setSize(t,b);
         change = stim.change(t,b);
         %------------------------------------------------------------------
-        % Figure out the change stuff
+        % Figure out the change stuff for this trial! 
         %------------------------------------------------------------------
         % compute and grab a random index into the color matrix
         colorIndex = randperm(size(win.colors,1));
@@ -158,9 +170,8 @@ for b = 1:prefs.numBlocks
         stim.probeColor(t,b) = testColor;
         stim.probeLoc(t,b,:) = [changeLocX,changeLocY];
         stim.presentedColor(t,b) = sColor; % actual color that was presented
-        
         %--------------------------------------------------------
-        % Create and flip up the basic stimulus display
+        % Now that we're done, actually run all the trial events! 
         %--------------------------------------------------------
         Screen('FillRect',win.onScreen,win.foreColor);      % Draw the foreground win
         Screen('FillOval',win.onScreen,win.black,win.fixRect);           % Draw the fixation point
@@ -200,15 +211,8 @@ for b = 1:prefs.numBlocks
         % Wait for a response
         rtStart = GetSecs;
         
-        while KbCheck; end;
-        KbName('UnifyKeyNames');   % This command switches keyboard mappings to the OSX naming scheme, regardless of computer.
-        % unify key names so we don't need to mess when switching from mac
-        % to pc ...
-        escape = KbName('ESCAPE');  % Mac == 'ESCAPE' % PC == 'esc'
-        prefs.changeKey = KbName('/?'); % on mac, 56 % 191 == / pc
-        prefs.nochangeKey = KbName('z'); % on mac, 29  % 90 == z
-        space = KbName('space');
-        
+        % use a while loop for the response so that we can escape out and
+        % save all data if we press escape! 
         while 1
             [keyIsDown,secs,keyCode]=KbCheck;
             if keyIsDown
@@ -229,6 +233,7 @@ for b = 1:prefs.numBlocks
             end
         end
         
+        % Blank the screen after the response 
         Screen('FillRect',win.onScreen,win.foreColor);            % Draw the foreground win
         Screen('FillOval',win.onScreen,win.black,win.fixRect);           % Draw the fixation point
         Screen('DrawingFinished',win.onScreen);
