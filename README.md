@@ -1,7 +1,7 @@
 # Read me for Color Change Detection Task
 written by Kirsten Adam, last updated 27 July 2017
 ## Required software
-This code runs in MATLAB using Psychtoolbox (<http://psychtoolbox.org>).
+This code runs in MATLAB using Psychtoolbox (<http://psychtoolbox.org>). The task should be compatible with both Mac and PC - it was tested on an iMac running OS X El Capitan (10.11.6) and on a PC running Windows 7. 
 
 ## Setting up the code
 Place the experiment script and the instructions file in a folder, and make sure this folder is on Matlab's path. Right now, the script is set up to create a folder called `Subject Data` within the current directory and save the data there. If you want the data to be saved elsewhere, you will need to update the experiment's main directory, `p.root`. 
