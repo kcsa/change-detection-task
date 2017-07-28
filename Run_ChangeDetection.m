@@ -1,6 +1,8 @@
 %-------------------------------------------------------------------------
-% Script to run multiple experimental scripts in a row
-% Programmed by Kirsten Adam, June 2014
+% Script to run a single-probe color change detection task for measuring
+% visual working memory.
+%
+% Programmed by Kirsten Adam, June 2014; updated July 2017
 %-------------------------------------------------------------------------
 function Run_ChangeDetection
 clear all;  % clear everything out!
@@ -15,20 +17,28 @@ prompt = {'Subject Number'};            % what information do we want from the s
 defAns = {''};                                           % fill in some stock answers - here the fields are left blank
 box = inputdlg(prompt,'Enter Subject Info');       % build the GUI
 
-p.clockOutput = clock; % record time and date!! 
-p.rndSeed = round(sum(100*p.clockOutput));
+p.date_time_start = clock; % record time and date of the start of the sesssion !!
 
 if length(box) == length(defAns)                            % check to make sure something was typed in
-    p.subNum = str2num(box{1}); 
-    rand('state',p.rndSeed);
+    p.subNum = str2num(box{1});
 else
     return;                                                 % if nothing was entered or the subject hit cancel, bail out
 end
+
+% Set the random seed
+rng default
+rng shuffle
+p.rndSeed = rng;
 %-------------------------------------------------------------------------
 % Important options
 %-------------------------------------------------------------------------
-p.is_PC = ispc; % detects whether this is a PC or windows machine.
-p.windowed = 1; % 1 = smaller window for easy debugging!
+p.windowed = 0; % 1 = smaller window for easy debugging!
+p.manually_hide_taskbar = 0; % If this is a PC and you want to use the Mex file to hide the taskbar manually
+
+% Throw an error if you try to manually hide the taskbar on a Mac
+if p.manually_hide_taskbar && ~ispc
+    error('Cannot manually hide the taskbar on Mac OS!')
+end
 %-------------------------------------------------------------------------
 % Build an output directory & check to make sure it doesn't already exist
 %-------------------------------------------------------------------------
@@ -44,9 +54,9 @@ win = openWindow(p);
 %Manually hide the task bar so it doesn't pop up because of flipping
 %the PTB screen during GetMouse: (Note, this is only needed because of an annoying
 % glitch with newer windows machines specifically when calling functions within functions.
-% To avoid having to do this, you can instead make one single script with sub-functions instead of separately
-% saving multiple function files and calling functions from separate scripts. 
-if p.is_PC
+% Setting the windows settings to "auto-hide the taskbar" can also work,
+% try that first.
+if p.manually_hide_taskbar
     ShowHideWinTaskbarMex(0);
 end
 %-------------------------------------------------------------------------
@@ -54,7 +64,7 @@ end
 %-------------------------------------------------------------------------
 % Build an output file and check to make sure that it doesn't exist yet
 % either
-fileName = [p.root,filesep,'Subject Data',filesep,num2str(p.subNum), '_ColorK_9colors.mat'];
+fileName = [p.root,filesep,'Subject Data',filesep,num2str(p.subNum), '_ColorK.mat'];
 if p.subNum ~= 0 % "0" is considered the practice subject number -- if any other # except 0 don't allow over-writing of the file
     if exist(fileName)
         Screen('CloseAll');
@@ -69,7 +79,6 @@ commandwindow; % select the command win to avoid typing in open scripts
 ListenChar(2); % don't print things in the command window
 
 % set the random state to the random seed at the beginning of the experiment!!
-rand('state',p.rndSeed);
 prefs = getPreferences();  % function that grabs all of our preferences (at the bottom of this script)
 
 % set up fixation point rect (b/c uses both prefs and win)
@@ -94,7 +103,7 @@ stim.probeColor = NaN(prefs.numTrials,prefs.numBlocks); % color presented during
 % of all items. stim.itemLocs{trialNumber,blockNumber} = [xloc1 xloc2 ....; yloc1, yloc2 ...];
 % stim.itemColors is a cell structure taht identifies the color of each
 % item. stim.itemColors{trialNumber,blockNumber} = [col1,col2...]. To
-% identify the RGB value, find the matching row in stim.colorList.
+% identify the RGB value, find the matching row in win.colors
 %---------------------------------------------------
 %  Put up instructions
 instruct(win)
@@ -109,8 +118,8 @@ for b = 1:prefs.numBlocks
     stim.setSize(:,b) = prefs.setSizes(prefs.fullFactorialDesign(prefs.order(:,b), 1));
     stim.change(:,b) = prefs.change(prefs.fullFactorialDesign(prefs.order(:,b),2));
     
-    % save the color list!! for later use!!!
-    stim.colorList = win.colors_9; 
+    win.colors = win.colors_9;
+    
     %-------------------------------------------------------
     % Begin Trial Loop
     %-------------------------------------------------------
@@ -120,77 +129,71 @@ for b = 1:prefs.numBlocks
         %--------------------------------------------------------
         nItems = stim.setSize(t,b);
         change = stim.change(t,b);
-        
-        win.colors = win.colors_9;
-        %--------------------------------------------------------
-        % Create and flip up the basic stimulus display
-        %--------------------------------------------------------
-        Screen('FillRect',win.onScreen,win.foreColor,win.foreRect);      % Draw the foreground win
-        Screen('FillOval',win.onScreen,win.black,win.fixRect);           % Draw the fixation point
-        Screen('DrawingFinished',win.onScreen);                          % Tell ptb we're done drawing for the moment (makes subsequent flip command execute faster)
-        Screen('Flip',win.onScreen);                                     % Flip all the stuff we just drew onto the main display
-        
+        %------------------------------------------------------------------
+        % Figure out the change stuff
+        %------------------------------------------------------------------
         % compute and grab a random index into the color matrix
         colorIndex = randperm(size(win.colors,1));
         
         % calculate the stimulus locations for this trial!
         %%% centroid coordinates for all items!!
         [xPos,yPos] = getStimLocs(prefs,win,nItems);
+        RECTS = [(xPos-prefs.stimSize/2);(yPos-prefs.stimSize/2);(xPos+prefs.stimSize/2);(yPos+prefs.stimSize/2)];
         
         %%%% save the locations of ALL items!!!!
         stim.itemLocs{t,b} = [xPos;yPos];
         stim.itemColors{t,b} = colorIndex(1:nItems);
-        
-        % Wait the fixation interval
-        WaitSecs(prefs.ITI); %
-        
-        % Draw squares on the main win
-        Screen('FillRect',win.onScreen,win.foreColor,win.foreRect);            % Draw the foreground win
-        Screen('FillOval',win.onScreen,win.black,win.fixRect);           % Draw the fixation point
-        for i = 1:nItems % note, this could be made faster with "FillRects" instead of a loop! 
-            Screen('FillRect',win.onScreen,win.colors(colorIndex(i),:),[(xPos(i)-prefs.stimSize/2),(yPos(i)-prefs.stimSize/2),(xPos(i)+prefs.stimSize/2),(yPos(i)+prefs.stimSize/2)]);
-        end
-        Screen('DrawingFinished',win.onScreen);
-        Screen('Flip',win.onScreen);
-        
-        % Wait the sample duration
-        WaitSecs(prefs.stimulusDuration); % stimulus Dur + retention, since not a memory task ...
-        
-        % draw blank screen
-        Screen('FillRect',win.onScreen,win.foreColor,win.foreRect);            % Draw the foreground win
-        Screen('FillOval',win.onScreen,win.black,win.fixRect);           % Draw the fixation point
-        Screen('DrawingFinished',win.onScreen);
-        Screen('Flip',win.onScreen);
-        
-        %------------------------------------------------------------------
-        % Figure out the change stuff
-        %------------------------------------------------------------------
         changeIndex = randperm(nItems);
         changeLocX = xPos(changeIndex(1)); changeLocY = yPos(changeIndex(1));
         
         sColor = colorIndex(changeIndex(1));  % sColor is the square-of-interest's color if NOT a change condition!
         dColors = Shuffle(colorIndex(~ismember(colorIndex,sColor))); % different colors from chosen square
-        changeColor = win.colors(dColors(1),:); % now we use the index to pick the change color!
+        changeColor = dColors(1); % now we use the index to pick the change color!
+        
+        if change == 1
+            testColor = changeColor;
+        else
+            testColor = sColor;
+        end
+        stim.probeColor(t,b) = testColor;
+        stim.probeLoc(t,b,:) = [changeLocX,changeLocY];
+        stim.presentedColor(t,b) = sColor; % actual color that was presented
+        
+        %--------------------------------------------------------
+        % Create and flip up the basic stimulus display
+        %--------------------------------------------------------
+        Screen('FillRect',win.onScreen,win.foreColor);      % Draw the foreground win
+        Screen('FillOval',win.onScreen,win.black,win.fixRect);           % Draw the fixation point
+        Screen('DrawingFinished',win.onScreen);                          % Tell ptb we're done drawing for the moment (makes subsequent flip command execute faster)
+        Screen('Flip',win.onScreen);                                     % Flip all the stuff we just drew onto the main display
+        
+        % Wait the fixation interval
+        WaitSecs(prefs.ITI); % For better timing with EEG, use with the 'UntilTime' option with the WaitSecs function. Not really necessary for behavior tasks.
+        
+        % Draw squares on the main win
+        Screen('FillRect',win.onScreen,win.foreColor);            % Draw the background win (not just in foreground, or taskbar will show up!!)
+        Screen('FillOval',win.onScreen,win.black,win.fixRect);           % Draw the fixation point
+        Screen('FillRect',win.onScreen,win.colors(colorIndex(1:nItems),:)',RECTS);
+        Screen('DrawingFinished',win.onScreen);
+        Screen('Flip',win.onScreen);
+        
+        % Wait the sample duration
+        WaitSecs(prefs.stimulusDuration);
+        
+        % draw blank screen
+        Screen('FillRect',win.onScreen,win.foreColor);
+        Screen('FillOval',win.onScreen,win.black,win.fixRect);           % Draw the fixation point
+        Screen('DrawingFinished',win.onScreen);
+        Screen('Flip',win.onScreen);
         
         % wait the ISI
         WaitSecs(prefs.retentionInterval); % stimulus Dur + retention, since not a memory task ...
         
         % Draw a new square on the screen, with the color value determined
         % by whether it's a change trial or not
-        Screen('FillRect',win.onScreen,win.foreColor,win.foreRect);            % Draw the foreground win
+        Screen('FillRect',win.onScreen,win.foreColor);
         Screen('FillOval',win.onScreen,win.black,win.fixRect);           % Draw the fixation point
-        if change == 1
-            Screen('FillRect',win.onScreen,changeColor,[(changeLocX-prefs.stimSize/2),(changeLocY-prefs.stimSize/2),(changeLocX+prefs.stimSize/2),(changeLocY+prefs.stimSize/2)]);
-            stim.probeColor(t,b) = dColors(1);
-            stim.probeLoc(t,b,:) = [changeLocX,changeLocY];
-        else
-            Screen('FillRect',win.onScreen,win.colors(sColor,:),[(changeLocX-prefs.stimSize/2),(changeLocY-prefs.stimSize/2),(changeLocX+prefs.stimSize/2),(changeLocY+prefs.stimSize/2)]);
-            stim.probeColor(t,b) = sColor;
-            stim.probeLoc(t,b,:) = [changeLocX,changeLocY];
-        end
-        
-        stim.presentedColor(t,b) = sColor;
-        
+        Screen('FillRect',win.onScreen,win.colors(testColor,:),[(changeLocX-prefs.stimSize/2),(changeLocY-prefs.stimSize/2),(changeLocX+prefs.stimSize/2),(changeLocY+prefs.stimSize/2)]);
         Screen('DrawingFinished',win.onScreen);
         Screen('Flip',win.onScreen);
         
@@ -216,8 +219,8 @@ for b = 1:prefs.numBlocks
                     Screen('CloseAll');
                     return;
                 end
-                kp = find(keyCode); 
-                kp = kp(1); % in case they press 2 buttons at the EXACT same time!!! Not that this some previous experiment sessions, but yep. it did. 
+                kp = find(keyCode);
+                kp = kp(1); % in case they press 2 buttons at the EXACT same time!!! Not that this some previous experiment sessions, but yep. it did.
                 if kp== prefs.changeKey || kp== prefs.nochangeKey
                     stim.response(t,b)=kp;
                     rtEnd = GetSecs;
@@ -226,7 +229,7 @@ for b = 1:prefs.numBlocks
             end
         end
         
-        Screen('FillRect',win.onScreen,win.foreColor,win.foreRect);            % Draw the foreground win
+        Screen('FillRect',win.onScreen,win.foreColor);            % Draw the foreground win
         Screen('FillOval',win.onScreen,win.black,win.fixRect);           % Draw the fixation point
         Screen('DrawingFinished',win.onScreen);
         Screen('Flip',win.onScreen);
@@ -258,7 +261,7 @@ for b = 1:prefs.numBlocks
         tic
         while toc < prefs.breakLength*60;
             tocInd = round(toc);
-            Screen('FillRect',win.onScreen,win.foreColor,win.foreRect);            % Draw the foreground win
+            Screen('FillRect',win.onScreen,win.foreColor);            % Draw the foreground win
             Screen('FillOval',win.onScreen,win.black,win.fixRect);           % Draw the fixation point
             Screen(win.onScreen, 'DrawText', 'Take a break.', win.centerX-110, win.centerY-75, [255 255 255]);
             Screen(win.onScreen, 'DrawText',['Time Remaining: ',char(num2str((prefs.breakLength*60)-tocInd))], win.centerX-110, win.centerY-40, [255 0 0 ]);
@@ -287,16 +290,19 @@ for b = 1:prefs.numBlocks
         
     end
 end    % end of the block loop
+
+p.date_time_end = clock; % record time and date of the end of the sesssion
+% save data file at the end of the whole session
+save(fileName,'p','stim','prefs','win');
 %-------------------------------------------------------------------------
-% Close psychtoolbox window and clear it all out! 
+% Close psychtoolbox window and clear it all out!
 %-------------------------------------------------------------------------
-sca;
-ListenChar(0);
-if p.is_PC
-ShowHideWinTaskbarMex(1);
+sca; % close psychtoolbox screen
+ListenChar(0); % allow typing again
+if p.manually_hide_taskbar
+    ShowHideWinTaskbarMex(1);
 end
 close all;
-clear all;
 end % End of the main "run experiment" function
 
 %-------------------------------------------------------------------------
@@ -325,7 +331,6 @@ InstructText = ['Remember the colors! \n'...
 % Show image again, but with explanatory text
 Screen('FillRect', win.onScreen, win.gray);
 Screen('TextSize', win.onScreen, win.fontsize);
-
 Screen('PutImage',win.onScreen,InstructImage,CenterRectOnPoint(rectInstruct,rectTestCoor(1),rectTestCoor(2)));
 Screen('TextSize', win.onScreen, textSize); % 24 = number pixels
 DrawFormattedText(win.onScreen, InstructText, win.centerX-textOffset,win.centerY+(sizeInstruct(1)*.35),win.white);
@@ -451,9 +456,9 @@ end
 
 end
 %-------------------------------------------------------------------------
-%  OPEN THE MAIN EXPERIMENT WINDOW! 
+%  OPEN THE MAIN EXPERIMENT WINDOW!
 %-------------------------------------------------------------------------
-function win = openWindow(p) % open up the window! 
+function win = openWindow(p) % open up the window!
 
 win.screenNumber = min(Screen('Screens')); % may need to change for multiscreen displays
 %-------------------------------------------------------------------------
@@ -503,10 +508,10 @@ win.colors_9 = [255 0 0; ... % red
     0 0 255; ...% blue
     255 255 0; ... % yellow
     255 0 255; ... % magenta
-    0 255 255; ... % cyan 
+    0 255 255; ... % cyan
     255 255 255; ... % white
     1 1 1; ... %black
-    255 128 0]; % orange! 
+    255 128 0]; % orange!
 
 win.fontsize = 24;
 
@@ -524,22 +529,20 @@ prefs.setSizes = [4,6,8]; % only set size 2 for this experiment right now.
 prefs.change = [0,1]; % 0 = no change, 1 = change!
 
 %%%%% timing
-prefs.retentionInterval =  1.000; % win.refRate;% 1 sec  (or, if we don't do this we can jitter .... )
-prefs.stimulusDuration = .250; %win.refRate/2;% 500 ms
-prefs.ITI = 1.000;  %prefs.retentionInterval;
-prefs.breakLength = .5; % number of minutes for block
+prefs.retentionInterval =  1.000;  % Could randomize with jitter if you want
+prefs.stimulusDuration = .250;
+prefs.ITI = 1.000;
+prefs.breakLength = .5;
 
 %%%%% stimulus size & positions
-prefs.stimSize = 51;
+prefs.stimSize = 60;
 prefs.minDist = prefs.stimSize*1.5;
 prefs.fixationSize = 6;
 
 %%%%% randomize trial order of full factorial design order
 prefs.fullFactorialDesign = fullfact([length(prefs.setSizes), ...
     length(prefs.change), ...
-    length(prefs.retentionInterval), ...
-    length(prefs.stimulusDuration), ...
-    prefs.nTrialsPerCondition]);  %add prefs.numBlocks? No, because we are using fully counterbalanced blocks.
+    prefs.nTrialsPerCondition]);
 
 %%%%% total number of trials in each fully-crossed block.
 prefs.numTrials = size(prefs.fullFactorialDesign,1);
