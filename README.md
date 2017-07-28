@@ -1,16 +1,16 @@
 # Read me for Color Change Detection Task
-written by Kirsten Adam, last updated 27 July 2017
+written by Kirsten Adam, last updated 28 July 2017
 
 ## Required software
 This code runs in MATLAB using Psychtoolbox (<http://psychtoolbox.org>). The task should be compatible with both Mac and PC - it was tested on an iMac running OS X El Capitan (10.11.6) and on a PC running Windows 7. 
 
 ## Setting up the code
-Place the experiment script and the instructions file in a folder, and make sure this folder is on Matlab's path. Right now, the script is set up to create a folder called `Subject Data` within the current directory and save the data there. If you want the data to be saved elsewhere, you will need to update the experiment's main directory, `p.root`. 
+Place the experiment script and the instructions PNG in a folder, and make sure this folder is on Matlab's path. Right now, the script is set up to create a folder called `Subject Data` within the current directory and save the data there. If you want the data to be saved elsewhere, you will need to update the experiment's main directory, `p.root`. 
 
 ## General notes
-* This code will not let you over-write existing data-files with the same subject number. For practice that will not be saved, use the subject number "0". Only this subject number can be over-written. If you want to save multiple files for the same subject (e.g. multiple sessions) you will need to change how the files are named / saved. d
+* This code will not let you over-write existing data-files with the same subject number. For demos that will not be saved, use the subject number "0". Only this subject number can be over-written. If you want to save multiple files for the same subject (e.g. multiple sessions) you will need to change how the files are named / saved.
 * To escape in the middle of a session, hit the "ESCAPE" button during the response screen. This will save all data up to the current trial. Otherwise, the data is only saved to the file at the end of each block of trials. 
-* If run on a Mac, the code is currently set to skip some of the psychtoolbox synchronization tests, ` Screen('Preference','SkipSyncTests',1);`. This is because when attempting to open a full screen window on an iMac, the code was unable to accurately detect the refresh rate and would not open. (Detects as 59.98 instead of 60 Hz). This does really impact task timing much at all, but caution & additional timing tests would be warranted if you wish to do extremely short Stimulus durations on a Mac (e.g. < 100 ms).
+* If run on a Mac, the code is currently set to skip some of the psychtoolbox synchronization tests, ` Screen('Preference','SkipSyncTests',1);`. This is because when attempting to open a full screen window on an iMac, the code was unable to accurately detect the refresh rate and would not open. (Detected as 59.98 instead of 60 Hz). This does not really impact task timing much (that I've seen), but caution & additional timing tests would be warranted if you wish to use extremely short stimulus durations on a Mac (e.g. < 100 ms).
 
 ## Common changes that need to be made 
 * Many of the key settings are in the sub-function `getPreferences()`. For example, you might change the number of blocks, set sizes, or number of trials per block. Set Size and Change (0 or 1) are fully counterbalanced within each block using the matlab function `fullfact`. To calculate the number of trials per block, multiple the length of `prefs.setSizes`, `prefs.change`, and the desired number of repetitions, `prefs.nTrialsPerCondition`. To add a new condition to be counterbalanced within block, you can easily do so by adding it to `prefs.fullFactorialDesign`. 
